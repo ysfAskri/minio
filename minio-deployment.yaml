@@ -44,7 +44,9 @@ spec:
                   key: root-password
           ports:
             - containerPort: 9000
+              name: api
             - containerPort: 9001
+              name: console
           volumeMounts:
             - name: storage
               mountPath: "/data"
@@ -57,3 +59,13 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            periodSeconds: 20
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            periodSeconds: 20
