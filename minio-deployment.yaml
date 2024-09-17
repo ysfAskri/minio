@@ -63,9 +63,11 @@ spec:
             httpGet:
               path: /minio/health/ready
               port: api
+              scheme: HTTPS
             periodSeconds: 20
           livenessProbe:
             httpGet:
               path: /minio/health/live
               port: api
+              scheme: HTTPS
             periodSeconds: 20
