@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,8 +30,6 @@ spec:
             - /data
             - --console-address
             - ":9001"
-            - --certs-dir
-            - /certs
           env:
             - name: MINIO_ROOT_USER
               valueFrom:
@@ -42,6 +41,8 @@ spec:
                 secretKeyRef:
                   name: minio-secret
                   key: root-password
+            - name: MINIO_SERVER_URL
+              value: "https://minio.fallah.ai"
           ports:
             - containerPort: 9000
               name: api
@@ -51,7 +52,7 @@ spec:
             - name: storage
               mountPath: "/data"
             - name: certs
-              mountPath: "/certs"
+              mountPath: "/root/.minio/certs"
           resources:
             requests:
               cpu: 250m
@@ -63,11 +64,67 @@ spec:
             httpGet:
               path: /minio/health/ready
               port: api
-              scheme: HTTPS
+              scheme: HTTP
+            initialDelaySeconds: 120
             periodSeconds: 20
           livenessProbe:
             httpGet:
               path: /minio/health/live
               port: api
-              scheme: HTTPS
+              scheme: HTTP
+            initialDelaySeconds: 120
             periodSeconds: 20
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: minio
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio-ingress
+  namespace: minio
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - minio.fallah.ai
+      secretName: minio-tls
+  rules:
+    - host: minio.fallah.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000
+          - path: /console
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9001
